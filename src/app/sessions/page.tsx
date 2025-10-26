@@ -8,10 +8,12 @@ import {
   deleteSession,
   updateAttendance,
   addExtraPoints,
+  addSessionTask,
+  deleteSessionTask,
 } from '@/lib/actions';
 import { Session, SessionWithAttendance } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Users, ChevronDown, ChevronUp, Star } from 'lucide-react';
+import { Plus, Trash2, Users, ChevronDown, ChevronUp, Star, ListTodo, CalendarDays } from 'lucide-react';
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -21,6 +23,9 @@ export default function SessionsPage() {
   const [sessionDetails, setSessionDetails] = useState<SessionWithAttendance | null>(null);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [participationPoints, setParticipationPoints] = useState<{ [key: string]: string }>({});
+  const [taskFormVisible, setTaskFormVisible] = useState(false);
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', dueDate: '' });
+  const [submittingTask, setSubmittingTask] = useState(false);
 
   useEffect(() => {
     loadSessions();
@@ -63,11 +68,14 @@ export default function SessionsPage() {
     if (expandedSession === session_id) {
       setExpandedSession(null);
       setSessionDetails(null);
+      setTaskFormVisible(false);
     } else {
       setExpandedSession(session_id);
       setLoadingAttendance(true);
       const details = await getSessionWithAttendance(session_id);
       setSessionDetails(details);
+      setTaskFormVisible(false);
+      setTaskForm({ title: '', description: '', dueDate: '' });
       setLoadingAttendance(false);
     }
   };
@@ -109,6 +117,37 @@ export default function SessionsPage() {
       // Reload to show updated totals
       loadSessions();
     }
+  };
+
+  const handleAddTask = async (e: React.FormEvent<HTMLFormElement>, session_id: string) => {
+    e.preventDefault();
+    if (!taskForm.title.trim()) {
+      alert('Task title is required');
+      return;
+    }
+
+    setSubmittingTask(true);
+    const result = await addSessionTask({
+      session_id,
+      title: taskForm.title.trim(),
+      description: taskForm.description.trim() || undefined,
+      due_date: taskForm.dueDate || undefined,
+    });
+    setSubmittingTask(false);
+
+    if (result.success) {
+      setTaskForm({ title: '', description: '', dueDate: '' });
+      setTaskFormVisible(false);
+      const details = await getSessionWithAttendance(session_id);
+      setSessionDetails(details);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: number, session_id: string) => {
+    if (!confirm('Delete this task?')) return;
+    await deleteSessionTask(taskId);
+    const details = await getSessionWithAttendance(session_id);
+    setSessionDetails(details);
   };
 
   if (loading) {
@@ -183,246 +222,390 @@ export default function SessionsPage() {
                     <div className="py-8 text-center text-muted-foreground">
                       Loading attendance...
                     </div>
-                  ) : sessionDetails && sessionDetails.attendance.length > 0 ? (
+                  ) : sessionDetails ? (
                     <>
-                      {/* Attendance Stats */}
-                      <div className="mb-4 rounded-lg bg-muted/30 p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">
-                              Attendance Rate
-                            </p>
-                            <p className="text-2xl font-bold">
-                              {(
-                                (sessionDetails.attendance.filter(
-                                  (a) => Number(a.points) === 5
-                                ).length /
-                                  sessionDetails.attendance.length) *
-                                100
-                              ).toFixed(0)}
-                              %
-                            </p>
+                      <div className="mb-6 rounded-lg border bg-muted/30 p-4">
+                        <div className="mb-4 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ListTodo className="h-5 w-5 text-muted-foreground" />
+                            <h4 className="text-lg font-semibold">Session Tasks</h4>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground">
-                              {
-                                sessionDetails.attendance.filter(
-                                  (a) => Number(a.points) === 5
-                                ).length
-                              }{' '}
-                              / {sessionDetails.attendance.length} attended
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {
-                                sessionDetails.attendance.filter(
-                                  (a) => Number(a.points) === 2.5
-                                ).length
-                              }{' '}
-                              communicated absence
-                            </p>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant={taskFormVisible ? 'secondary' : 'outline'}
+                            onClick={() => setTaskFormVisible((prev) => !prev)}
+                            className="gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            {taskFormVisible ? 'Cancel' : 'Add Task'}
+                          </Button>
                         </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                        <thead className="border-b bg-muted/50">
-                          <tr>
-                            <th className="p-3 text-left text-sm font-medium">Student</th>
-                            <th className="p-3 text-left text-sm font-medium">Company</th>
-                            <th className="p-3 text-center text-sm font-medium">
-                              Current Points
-                            </th>
-                            <th className="p-3 text-center text-sm font-medium">
-                              Mark Attendance
-                            </th>
-                            <th className="p-3 text-center text-sm font-medium">
-                              Participation Points
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sessionDetails.attendance.map((att) => (
-                            <tr key={att.student_id} className="border-b last:border-0">
-                              <td className="p-3">
-                                <div className="font-medium">{att.student_name}</div>
-                              </td>
-                              <td className="p-3 text-sm text-muted-foreground">
-                                {att.company}
-                              </td>
-                              <td className="p-3 text-center">
-                                <span
-                                  style={{
-                                    display: 'inline-block',
-                                    borderRadius: '9999px',
-                                    border: '1px solid',
-                                    padding: '4px 12px',
-                                    fontSize: '14px',
-                                    fontWeight: 500,
-                                    ...(Number(att.points) === 0
-                                      ? {
-                                          backgroundColor: '#dc2626',
-                                          borderColor: '#dc2626',
-                                          color: 'white',
-                                        }
-                                      : Number(att.points) === 2.5
-                                      ? {
-                                          backgroundColor: '#eab308',
-                                          borderColor: '#eab308',
-                                          color: 'white',
-                                        }
-                                      : Number(att.points) === 5
-                                      ? {
-                                          backgroundColor: '#16a34a',
-                                          borderColor: '#16a34a',
-                                          color: 'white',
-                                        }
-                                      : {
-                                          backgroundColor: '#f3f4f6',
-                                          borderColor: '#d1d5db',
-                                          color: '#374151',
-                                        }),
-                                  }}
+
+                        {taskFormVisible && (
+                          <form
+                            onSubmit={(e) => handleAddTask(e, session.session_id)}
+                            className="mb-4 grid gap-3 md:grid-cols-[2fr,3fr,1fr] md:items-end"
+                          >
+                            <div>
+                              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                Title
+                              </label>
+                              <input
+                                type="text"
+                                name="title"
+                                required
+                                value={taskForm.title}
+                                onChange={(e) =>
+                                  setTaskForm((prev) => ({ ...prev, title: e.target.value }))
+                                }
+                                placeholder="Prepare slide deck"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                Description
+                              </label>
+                              <textarea
+                                name="description"
+                                rows={1}
+                                value={taskForm.description}
+                                onChange={(e) =>
+                                  setTaskForm((prev) => ({
+                                    ...prev,
+                                    description: e.target.value,
+                                  }))
+                                }
+                                placeholder="Optional details or resource links"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
+                              <div className="w-full md:w-auto">
+                                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                  Due Date
+                                </label>
+                                <input
+                                  type="date"
+                                  name="due_date"
+                                  value={taskForm.dueDate}
+                                  onChange={(e) =>
+                                    setTaskForm((prev) => ({ ...prev, dueDate: e.target.value }))
+                                  }
+                                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                                />
+                              </div>
+                              <Button type="submit" disabled={submittingTask} className="md:self-end">
+                                {submittingTask ? 'Saving...' : 'Save Task'}
+                              </Button>
+                            </div>
+                          </form>
+                        )}
+
+                        {sessionDetails.tasks && sessionDetails.tasks.length > 0 ? (
+                          <div className="space-y-3">
+                            {sessionDetails.tasks.map((task) => (
+                              <div
+                                key={task.id}
+                                className="flex items-start justify-between gap-4 rounded-lg border bg-background p-3"
+                              >
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{task.title}</p>
+                                  {task.description && (
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                      {task.description}
+                                    </p>
+                                  )}
+                                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    {task.created_at && (
+                                      <span>
+                                        Added{' '}
+                                        {new Date(task.created_at).toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                        })}
+                                      </span>
+                                    )}
+                                    {task.due_date && (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1">
+                                        <CalendarDays className="h-3 w-3" />
+                                        Due{' '}
+                                        {new Date(task.due_date).toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                        })}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteTask(task.id, session.session_id)}
+                                  className="text-destructive hover:text-destructive"
                                 >
-                                  {att.points} pts
-                                </span>
-                              </td>
-                              <td className="p-3">
-                                <div className="flex justify-center gap-2">
-                                  <button
-                                    onClick={() =>
-                                      handleUpdateAttendance(
-                                        att.student_id,
-                                        session.session_id,
-                                        0
-                                      )
-                                    }
-                                    style={{
-                                      padding: '6px 12px',
-                                      fontSize: '14px',
-                                      fontWeight: 500,
-                                      borderRadius: '6px',
-                                      border: '1px solid',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s',
-                                      ...(Number(att.points) === 0
-                                        ? {
-                                            backgroundColor: '#dc2626',
-                                            borderColor: '#dc2626',
-                                            color: 'white',
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No tasks yet. Add one to help students prepare.
+                          </p>
+                        )}
+                      </div>
+
+                      {sessionDetails.attendance.length > 0 ? (
+                        <>
+                          <div className="mb-4 rounded-lg bg-muted/30 p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-muted-foreground">
+                                  Attendance Rate
+                                </p>
+                                <p className="text-2xl font-bold">
+                                  {(
+                                    (sessionDetails.attendance.filter(
+                                      (a) => Number(a.points) === 5
+                                    ).length /
+                                      sessionDetails.attendance.length) *
+                                    100
+                                  ).toFixed(0)}
+                                  %
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm text-muted-foreground">
+                                  {
+                                    sessionDetails.attendance.filter(
+                                      (a) => Number(a.points) === 5
+                                    ).length
+                                  }{' '}
+                                  / {sessionDetails.attendance.length} attended
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {
+                                    sessionDetails.attendance.filter(
+                                      (a) => Number(a.points) === 2.5
+                                    ).length
+                                  }{' '}
+                                  communicated absence
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="border-b bg-muted/50">
+                                <tr>
+                                  <th className="p-3 text-left text-sm font-medium">Student</th>
+                                  <th className="p-3 text-left text-sm font-medium">Company</th>
+                                  <th className="p-3 text-center text-sm font-medium">
+                                    Current Points
+                                  </th>
+                                  <th className="p-3 text-center text-sm font-medium">
+                                    Mark Attendance
+                                  </th>
+                                  <th className="p-3 text-center text-sm font-medium">
+                                    Participation Points
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sessionDetails.attendance.map((att) => (
+                                  <tr key={att.student_id} className="border-b last:border-0">
+                                    <td className="p-3">
+                                      <div className="font-medium">{att.student_name}</div>
+                                    </td>
+                                    <td className="p-3 text-sm text-muted-foreground">
+                                      {att.company}
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      <span
+                                        style={{
+                                          display: 'inline-block',
+                                          borderRadius: '9999px',
+                                          border: '1px solid',
+                                          padding: '4px 12px',
+                                          fontSize: '14px',
+                                          fontWeight: 500,
+                                          ...(Number(att.points) === 0
+                                            ? {
+                                                backgroundColor: '#dc2626',
+                                                borderColor: '#dc2626',
+                                                color: 'white',
+                                              }
+                                            : Number(att.points) === 2.5
+                                            ? {
+                                                backgroundColor: '#eab308',
+                                                borderColor: '#eab308',
+                                                color: 'white',
+                                              }
+                                            : Number(att.points) === 5
+                                            ? {
+                                                backgroundColor: '#16a34a',
+                                                borderColor: '#16a34a',
+                                                color: 'white',
+                                              }
+                                            : {
+                                                backgroundColor: '#f3f4f6',
+                                                borderColor: '#d1d5db',
+                                                color: '#374151',
+                                              }),
+                                        }}
+                                      >
+                                        {att.points} pts
+                                      </span>
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="flex justify-center gap-2">
+                                        <button
+                                          onClick={() =>
+                                            handleUpdateAttendance(
+                                              att.student_id,
+                                              session.session_id,
+                                              0
+                                            )
                                           }
-                                        : {
-                                            backgroundColor: 'white',
-                                            borderColor: '#d1d5db',
-                                            color: '#374151',
-                                          }),
-                                    }}
-                                  >
-                                    Absent (0)
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleUpdateAttendance(
-                                        att.student_id,
-                                        session.session_id,
-                                        2.5
-                                      )
-                                    }
-                                    style={{
-                                      padding: '6px 12px',
-                                      fontSize: '14px',
-                                      fontWeight: 500,
-                                      borderRadius: '6px',
-                                      border: '1px solid',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s',
-                                      ...(Number(att.points) === 2.5
-                                        ? {
-                                            backgroundColor: '#eab308',
-                                            borderColor: '#eab308',
-                                            color: 'white',
+                                          style={{
+                                            padding: '6px 12px',
+                                            fontSize: '14px',
+                                            fontWeight: 500,
+                                            borderRadius: '6px',
+                                            border: '1px solid',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            ...(Number(att.points) === 0
+                                              ? {
+                                                  backgroundColor: '#dc2626',
+                                                  borderColor: '#dc2626',
+                                                  color: 'white',
+                                                }
+                                              : {
+                                                  backgroundColor: 'white',
+                                                  borderColor: '#d1d5db',
+                                                  color: '#374151',
+                                                }),
+                                          }}
+                                        >
+                                          Absent (0)
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            handleUpdateAttendance(
+                                              att.student_id,
+                                              session.session_id,
+                                              2.5
+                                            )
                                           }
-                                        : {
-                                            backgroundColor: 'white',
-                                            borderColor: '#d1d5db',
-                                            color: '#374151',
-                                          }),
-                                    }}
-                                  >
-                                    Communicated (2.5)
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleUpdateAttendance(
-                                        att.student_id,
-                                        session.session_id,
-                                        5
-                                      )
-                                    }
-                                    style={{
-                                      padding: '6px 12px',
-                                      fontSize: '14px',
-                                      fontWeight: 500,
-                                      borderRadius: '6px',
-                                      border: '1px solid',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s',
-                                      ...(Number(att.points) === 5
-                                        ? {
-                                            backgroundColor: '#16a34a',
-                                            borderColor: '#16a34a',
-                                            color: 'white',
+                                          style={{
+                                            padding: '6px 12px',
+                                            fontSize: '14px',
+                                            fontWeight: 500,
+                                            borderRadius: '6px',
+                                            border: '1px solid',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            ...(Number(att.points) === 2.5
+                                              ? {
+                                                  backgroundColor: '#eab308',
+                                                  borderColor: '#eab308',
+                                                  color: 'white',
+                                                }
+                                              : {
+                                                  backgroundColor: 'white',
+                                                  borderColor: '#d1d5db',
+                                                  color: '#374151',
+                                                }),
+                                          }}
+                                        >
+                                          Communicated (2.5)
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            handleUpdateAttendance(
+                                              att.student_id,
+                                              session.session_id,
+                                              5
+                                            )
                                           }
-                                        : {
-                                            backgroundColor: 'white',
-                                            borderColor: '#d1d5db',
-                                            color: '#374151',
-                                          }),
-                                    }}
-                                  >
-                                    Attended (5)
-                                  </button>
-                                </div>
-                              </td>
-                              <td className="p-3">
-                                <div className="flex items-center justify-center gap-2">
-                                  <input
-                                    type="number"
-                                    step="0.5"
-                                    min="0"
-                                    placeholder="0"
-                                    value={participationPoints[`${att.student_id}-${session.session_id}`] || ''}
-                                    onChange={(e) => 
-                                      setParticipationPoints(prev => ({
-                                        ...prev,
-                                        [`${att.student_id}-${session.session_id}`]: e.target.value
-                                      }))
-                                    }
-                                    className="w-20 rounded-md border bg-background px-2 py-1 text-center text-sm"
-                                  />
-                                  <button
-                                    onClick={() =>
-                                      handleAddParticipationPoints(
-                                        att.student_id,
-                                        session.session_id,
-                                        session.name
-                                      )
-                                    }
-                                    className="rounded-md border border-purple-600 bg-purple-600 px-2 py-1 text-white hover:bg-purple-700"
-                                    title="Add participation points"
-                                  >
-                                    <Star className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                          style={{
+                                            padding: '6px 12px',
+                                            fontSize: '14px',
+                                            fontWeight: 500,
+                                            borderRadius: '6px',
+                                            border: '1px solid',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            ...(Number(att.points) === 5
+                                              ? {
+                                                  backgroundColor: '#16a34a',
+                                                  borderColor: '#16a34a',
+                                                  color: 'white',
+                                                }
+                                              : {
+                                                  backgroundColor: 'white',
+                                                  borderColor: '#d1d5db',
+                                                  color: '#374151',
+                                                }),
+                                          }}
+                                        >
+                                          Attended (5)
+                                        </button>
+                                      </div>
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <input
+                                          type="number"
+                                          step="0.5"
+                                          min="0"
+                                          placeholder="0"
+                                          value={
+                                            participationPoints[
+                                              `${att.student_id}-${session.session_id}`
+                                            ] || ''
+                                          }
+                                          onChange={(e) =>
+                                            setParticipationPoints((prev) => ({
+                                              ...prev,
+                                              [`${att.student_id}-${session.session_id}`]:
+                                                e.target.value,
+                                            }))
+                                          }
+                                          className="w-20 rounded-md border bg-background px-2 py-1 text-center text-sm"
+                                        />
+                                        <button
+                                          onClick={() =>
+                                            handleAddParticipationPoints(
+                                              att.student_id,
+                                              session.session_id,
+                                              session.name
+                                            )
+                                          }
+                                          className="rounded-md border border-purple-600 bg-purple-600 px-2 py-1 text-white hover:bg-purple-700"
+                                          title="Add participation points"
+                                        >
+                                          <Star className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="py-8 text-center text-muted-foreground">
+                          No students enrolled yet. Add students to track attendance.
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="py-8 text-center text-muted-foreground">
-                      No students enrolled yet. Add students to track attendance.
+                      Unable to load session details right now.
                     </div>
                   )}
                 </div>

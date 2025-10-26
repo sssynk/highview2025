@@ -8,6 +8,8 @@ import {
   ExtraPoints,
   StudentWithPoints,
   SessionWithAttendance,
+  SessionTask,
+  StudentSessionTask,
   generateId,
 } from './types';
 import { revalidatePath } from 'next/cache';
@@ -173,9 +175,25 @@ export async function getSessionWithAttendance(
       [session_id]
     );
 
+    const tasksResult = await query(
+      `SELECT 
+        id,
+        session_id,
+        title,
+        description,
+        due_date,
+        created_at,
+        updated_at
+      FROM session_tasks
+      WHERE session_id = $1
+      ORDER BY created_at ASC`,
+      [session_id]
+    );
+
     return {
       ...sessionResult.rows[0],
       attendance: attendanceResult.rows,
+      tasks: tasksResult.rows,
     };
   } catch (error) {
     console.error('Error fetching session with attendance:', error);
@@ -214,6 +232,124 @@ export async function deleteSession(session_id: string) {
     return { success: true };
   } catch (error) {
     console.error('Error deleting session:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+// ========== SESSION TASK ACTIONS ==========
+
+export async function getSessionTasks(session_id: string): Promise<SessionTask[]> {
+  try {
+    const result = await query(
+      `SELECT 
+        id,
+        session_id,
+        title,
+        description,
+        due_date,
+        created_at,
+        updated_at
+      FROM session_tasks
+      WHERE session_id = $1
+      ORDER BY created_at ASC`,
+      [session_id]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching session tasks:', error);
+    return [];
+  }
+}
+
+export async function addSessionTask(data: {
+  session_id: string;
+  title: string;
+  description?: string;
+  due_date?: string | null;
+}) {
+  try {
+    await query(
+      `INSERT INTO session_tasks (session_id, title, description, due_date)
+       VALUES ($1, $2, $3, $4)`,
+      [
+        data.session_id,
+        data.title,
+        data.description || null,
+        data.due_date || null,
+      ]
+    );
+    revalidatePath('/sessions');
+    return { success: true };
+  } catch (error) {
+    console.error('Error adding session task:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function deleteSessionTask(taskId: number) {
+  try {
+    await query('DELETE FROM session_tasks WHERE id = $1', [taskId]);
+    revalidatePath('/sessions');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting session task:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function getTasksForStudent(student_id: string): Promise<StudentSessionTask[]> {
+  try {
+    const result = await query(
+      `SELECT 
+        t.id,
+        t.session_id,
+        t.title,
+        t.description,
+        t.due_date,
+        t.created_at,
+        t.updated_at,
+        sess.name as session_name,
+        sess.date as session_date,
+        CASE WHEN stc.id IS NOT NULL THEN TRUE ELSE FALSE END AS completed,
+        stc.completed_at
+      FROM session_tasks t
+      JOIN sessions sess ON t.session_id = sess.session_id
+      LEFT JOIN student_task_completions stc 
+        ON stc.task_id = t.id AND stc.student_id = $1
+      ORDER BY sess.date ASC, t.created_at ASC`,
+      [student_id]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching student tasks:', error);
+    return [];
+  }
+}
+
+export async function setTaskCompletion(data: {
+  task_id: number;
+  student_id: string;
+  completed: boolean;
+}) {
+  try {
+    if (data.completed) {
+      await query(
+        `INSERT INTO student_task_completions (task_id, student_id, completed_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT (task_id, student_id)
+         DO UPDATE SET completed_at = CURRENT_TIMESTAMP`,
+        [data.task_id, data.student_id]
+      );
+    } else {
+      await query(
+        'DELETE FROM student_task_completions WHERE task_id = $1 AND student_id = $2',
+        [data.task_id, data.student_id]
+      );
+    }
+    revalidatePath(`/student?id=${data.student_id}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating task completion:', error);
     return { success: false, error: String(error) };
   }
 }
@@ -531,4 +667,3 @@ export async function generateGoogleCalendarLink(session: any) {
 
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
-

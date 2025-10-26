@@ -76,6 +76,39 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS student_notes (
+        id SERIAL PRIMARY KEY,
+        student_id VARCHAR(50) REFERENCES students(student_id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_by VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS session_tasks (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(50) REFERENCES sessions(session_id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        due_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS student_task_completions (
+        id SERIAL PRIMARY KEY,
+        task_id INTEGER REFERENCES session_tasks(id) ON DELETE CASCADE,
+        student_id VARCHAR(50) REFERENCES students(student_id) ON DELETE CASCADE,
+        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(task_id, student_id)
+      )
+    `);
+
     // Create indexes for better query performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_session_attendance_student 
@@ -92,6 +125,26 @@ export const initializeDatabase = async () => {
       ON extra_points(student_id)
     `);
 
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_student_notes_student 
+      ON student_notes(student_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_session_tasks_session 
+      ON session_tasks(session_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_student_task_completions_student 
+      ON student_task_completions(student_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_student_task_completions_task 
+      ON student_task_completions(task_id)
+    `);
+
     await client.query('COMMIT');
     console.log('Database schema initialized successfully');
   } catch (error) {
@@ -104,4 +157,3 @@ export const initializeDatabase = async () => {
 };
 
 export default pool;
-

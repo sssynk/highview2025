@@ -153,6 +153,34 @@ async function runMigrations() {
     `);
     console.log('✅ Student_notes table created\n');
 
+    // Create session_tasks table
+    console.log('📋 Creating session_tasks table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS session_tasks (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(50) REFERENCES sessions(session_id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        due_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Session_tasks table created\n');
+
+    // Create student_task_completions table
+    console.log('📋 Creating student_task_completions table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS student_task_completions (
+        id SERIAL PRIMARY KEY,
+        task_id INTEGER REFERENCES session_tasks(id) ON DELETE CASCADE,
+        student_id VARCHAR(50) REFERENCES students(student_id) ON DELETE CASCADE,
+        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(task_id, student_id)
+      )
+    `);
+    console.log('✅ Student_task_completions table created\n');
+
     // Create indexes
     console.log('📋 Creating indexes...');
     await client.query(`
@@ -183,6 +211,18 @@ async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_student_notes_student 
       ON student_notes(student_id)
     `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_session_tasks_session 
+      ON session_tasks(session_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_student_task_completions_student 
+      ON student_task_completions(student_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_student_task_completions_task 
+      ON student_task_completions(task_id)
+    `);
     console.log('✅ Indexes created\n');
 
     await client.query('COMMIT');
@@ -207,4 +247,3 @@ runMigrations().catch((error) => {
   console.error('❌ Failed to run migrations:', error);
   process.exit(1);
 });
-

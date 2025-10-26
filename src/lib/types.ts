@@ -46,6 +46,24 @@ export interface SessionWithAttendance extends Session {
     company: string;
     points: number;
   }[];
+  tasks?: SessionTask[];
+}
+
+export interface SessionTask {
+  id: number;
+  session_id: string;
+  title: string;
+  description?: string | null;
+  due_date?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StudentSessionTask extends SessionTask {
+  session_name: string;
+  session_date: string;
+  completed: boolean;
+  completed_at?: string | null;
 }
 
 export interface DashboardStats {
@@ -115,4 +133,3 @@ export function generateId(prefix: string): string {
   const random = Math.random().toString(36).substring(2, 9);
   return `${prefix}-${timestamp}-${random}`.toUpperCase();
 }
-

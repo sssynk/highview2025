@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getStudentWithDetails,
   setupDatabase,
@@ -11,11 +11,13 @@ import {
   getStudentNotes,
   addStudentNote,
   deleteStudentNote,
+  getTasksForStudent,
+  setTaskCompletion,
 } from '@/lib/actions';
 import { getSession } from '@/lib/auth';
-import { StudentAttendanceRecord, StudentDetails, Session, SessionWithDetails, ProgressDataPoint, StudentNote } from '@/lib/types';
+import { StudentAttendanceRecord, StudentDetails, Session, SessionWithDetails, ProgressDataPoint, StudentNote, StudentSessionTask } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Calendar, BookOpen, Link2, FileText, Video, ExternalLink, Plus, Trash2, StickyNote } from 'lucide-react';
+import { Calendar, BookOpen, Link2, FileText, Video, ExternalLink, Plus, Trash2, StickyNote, ListTodo, CheckCircle2, Circle, Loader2, CalendarDays, Clock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function StudentPage() {
@@ -26,24 +28,70 @@ export default function StudentPage() {
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<SessionWithDetails | null>(null);
   const [showSessionDetails, setShowSessionDetails] = useState(false);
   const [notes, setNotes] = useState<StudentNote[]>([]);
+  const [sessionTasks, setSessionTasks] = useState<StudentSessionTask[]>([]);
+  const [updatingTaskId, setUpdatingTaskId] = useState<number | null>(null);
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [isInstructor, setIsInstructor] = useState(false);
+
+  const groupedTasks = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        sessionId: string;
+        sessionName: string;
+        sessionDate: string;
+        tasks: StudentSessionTask[];
+      }
+    >();
+
+    sessionTasks.forEach((task) => {
+      if (!map.has(task.session_id)) {
+        map.set(task.session_id, {
+          sessionId: task.session_id,
+          sessionName: task.session_name,
+          sessionDate: task.session_date,
+          tasks: [],
+        });
+      }
+      map.get(task.session_id)!.tasks.push(task);
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      const dateA = new Date(a.sessionDate).getTime();
+      const dateB = new Date(b.sessionDate).getTime();
+      return dateA - dateB;
+    });
+  }, [sessionTasks]);
 
   const loadStudentData = async () => {
     setLoading(true);
     const studentId = new URLSearchParams(window.location.search).get('id');
     if (studentId) {
-      const data = await getStudentWithDetails(studentId);
-      setStudent(data);
-      
-      const upcoming = await getUpcomingSessions();
+      const [
+        studentDetails,
+        upcoming,
+        progress,
+        notesData,
+        tasksData,
+      ] = await Promise.all([
+        getStudentWithDetails(studentId),
+        getUpcomingSessions(),
+        getStudentProgressChart(studentId),
+        getStudentNotes(studentId),
+        getTasksForStudent(studentId),
+      ]);
+
+      setStudent(studentDetails);
       setUpcomingSessions(upcoming);
-      
-      const progress = await getStudentProgressChart(studentId);
       setProgressData(progress);
-      
-      const notesData = await getStudentNotes(studentId);
       setNotes(notesData);
+      setSessionTasks(tasksData);
+    } else {
+      setStudent(null);
+      setUpcomingSessions([]);
+      setProgressData([]);
+      setNotes([]);
+      setSessionTasks([]);
     }
     setLoading(false);
   };
@@ -92,6 +140,27 @@ export default function StudentPage() {
     if (confirm('Are you sure you want to delete this note?')) {
       await deleteStudentNote(noteId);
       loadStudentData();
+    }
+  };
+
+  const handleToggleTask = async (taskId: number, shouldComplete: boolean) => {
+    if (!student) return;
+    setUpdatingTaskId(taskId);
+    try {
+      const result = await setTaskCompletion({
+        task_id: taskId,
+        student_id: student.student_id,
+        completed: shouldComplete,
+      });
+
+      if (result.success) {
+        const updatedTasks = await getTasksForStudent(student.student_id);
+        setSessionTasks(updatedTasks);
+      }
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    } finally {
+      setUpdatingTaskId(null);
     }
   };
 
@@ -237,6 +306,112 @@ export default function StudentPage() {
             </div>
           </div>
         )}
+
+        <div className="rounded-lg border bg-card p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <ListTodo className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Session Tasks</h2>
+          </div>
+          {groupedTasks.length > 0 ? (
+            <div className="space-y-4">
+              {groupedTasks.map((group) => {
+                const completedCount = group.tasks.filter((task) => task.completed).length;
+                return (
+                  <div
+                    key={group.sessionId}
+                    className="rounded-lg border bg-muted/30 p-4"
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <div>
+                        <p className="font-medium">{group.sessionName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(group.sessionDate).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {completedCount} of {group.tasks.length} complete
+                      </p>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {group.tasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className={`flex items-start gap-3 rounded-lg border bg-background p-3 transition-opacity ${
+                            task.completed ? 'opacity-75' : ''
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            aria-label={task.completed ? 'Mark task incomplete' : 'Mark task complete'}
+                            onClick={() => handleToggleTask(task.id, !task.completed)}
+                            disabled={updatingTaskId === task.id}
+                            className={`mt-1 flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${
+                              task.completed
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary'
+                            } ${updatingTaskId === task.id ? 'opacity-70' : ''}`}
+                          >
+                            {updatingTaskId === task.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : task.completed ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : (
+                              <Circle className="h-4 w-4" />
+                            )}
+                          </button>
+                          <div className="flex-1">
+                            <p
+                              className={`text-sm font-medium ${
+                                task.completed ? 'line-through text-muted-foreground' : ''
+                              }`}
+                            >
+                              {task.title}
+                            </p>
+                            {task.description && (
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {task.description}
+                              </p>
+                            )}
+                            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              {task.due_date && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1">
+                                  <CalendarDays className="h-3 w-3" />
+                                  Due{' '}
+                                  {new Date(task.due_date).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </span>
+                              )}
+                              {task.completed && task.completed_at && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  Marked complete{' '}
+                                  {new Date(task.completed_at).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No tasks assigned yet. Check back after your instructors add prep or follow-up work.
+            </p>
+          )}
+        </div>
 
         <div className="rounded-lg border bg-card p-6">
           <h2 className="text-xl font-semibold mb-4">Attendance History</h2>
