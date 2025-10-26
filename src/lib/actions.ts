@@ -11,6 +11,10 @@ import {
   generateId,
   AttendanceDispute,
   StudentAttendanceRecord,
+  Instructor,
+  SessionResource,
+  SessionWithDetails,
+  ProgressDataPoint,
 } from './types';
 import { revalidatePath } from 'next/cache';
 
@@ -450,5 +454,90 @@ export async function getDashboardStats() {
       topStudents: [],
     };
   }
+}
+
+export async function getUpcomingSessions(): Promise<Session[]> {
+  try {
+    const result = await query(
+      'SELECT * FROM sessions WHERE date >= CURRENT_DATE ORDER BY date ASC, name'
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching upcoming sessions:', error);
+    return [];
+  }
+}
+
+export async function getSessionDetails(
+  session_id: string
+): Promise<SessionWithDetails | null> {
+  try {
+    const sessionResult = await query(
+      'SELECT * FROM sessions WHERE session_id = $1',
+      [session_id]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return null;
+    }
+
+    const instructorsResult = await query(
+      `SELECT i.* 
+       FROM instructors i
+       JOIN session_instructors si ON i.instructor_id = si.instructor_id
+       WHERE si.session_id = $1`,
+      [session_id]
+    );
+
+    const resourcesResult = await query(
+      'SELECT * FROM session_resources WHERE session_id = $1 ORDER BY created_at ASC',
+      [session_id]
+    );
+
+    return {
+      ...sessionResult.rows[0],
+      instructors: instructorsResult.rows,
+      resources: resourcesResult.rows,
+    };
+  } catch (error) {
+    console.error('Error fetching session details:', error);
+    return null;
+  }
+}
+
+export async function getStudentProgressChart(
+  student_id: string
+): Promise<ProgressDataPoint[]> {
+  try {
+    const result = await query(
+      `SELECT 
+        s.date,
+        sa.points,
+        SUM(sa.points) OVER (ORDER BY s.date ASC) as cumulative_points
+      FROM sessions s
+      LEFT JOIN session_attendance sa ON s.session_id = sa.session_id AND sa.student_id = $1
+      ORDER BY s.date ASC`,
+      [student_id]
+    );
+    
+    return result.rows.map((row: { date: string; points: string | null; cumulative_points: string | null }) => ({
+      date: row.date,
+      points: parseFloat(row.points || '0'),
+      cumulative_points: parseFloat(row.cumulative_points || '0'),
+    }));
+  } catch (error) {
+    console.error('Error fetching progress chart data:', error);
+    return [];
+  }
+}
+
+export async function generateGoogleCalendarLink(session: Session): Promise<string> {
+  const title = encodeURIComponent(session.name);
+  const date = new Date(session.date);
+  const startDate = date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const endDate = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const details = encodeURIComponent(session.description || '');
+  
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}`;
 }
 

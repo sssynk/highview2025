@@ -48,6 +48,7 @@ export const initializeDatabase = async () => {
         session_id VARCHAR(50) PRIMARY KEY,
         name VARCHAR(200) NOT NULL,
         date DATE NOT NULL,
+        description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -90,6 +91,40 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    // Create instructors table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS instructors (
+        instructor_id VARCHAR(50) PRIMARY KEY,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        email VARCHAR(200) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create session_instructors table (many-to-many relationship)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS session_instructors (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(50) REFERENCES sessions(session_id) ON DELETE CASCADE,
+        instructor_id VARCHAR(50) REFERENCES instructors(instructor_id) ON DELETE CASCADE,
+        UNIQUE(session_id, instructor_id)
+      )
+    `);
+
+    // Create session_resources table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS session_resources (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(50) REFERENCES sessions(session_id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL CHECK (type IN ('slide', 'link', 'note', 'recording')),
+        title VARCHAR(200) NOT NULL,
+        url TEXT,
+        content TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create indexes for better query performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_session_attendance_student 
@@ -109,6 +144,16 @@ export const initializeDatabase = async () => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_attendance_disputes_student 
       ON attendance_disputes(student_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_session_instructors_session 
+      ON session_instructors(session_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_session_resources_session 
+      ON session_resources(session_id)
     `);
 
     await client.query('COMMIT');

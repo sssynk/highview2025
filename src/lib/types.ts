@@ -10,7 +10,31 @@ export interface Session {
   session_id: string;
   name: string;
   date: string;
+  description?: string;
   created_at?: Date;
+}
+
+export interface Instructor {
+  instructor_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  created_at?: Date;
+}
+
+export interface SessionResource {
+  id?: number;
+  session_id: string;
+  type: 'slide' | 'link' | 'note' | 'recording';
+  title: string;
+  url?: string;
+  content?: string;
+  created_at?: Date;
+}
+
+export interface SessionWithDetails extends Session {
+  instructors?: Instructor[];
+  resources?: SessionResource[];
 }
 
 export interface SessionAttendance {
@@ -72,6 +96,12 @@ export interface StudentDetails extends Student {
   total_session_points: number;
   total_extra_points: number;
   total_points: number;
+}
+
+export interface ProgressDataPoint {
+  date: string;
+  points: number;
+  cumulative_points: number;
 }
 
 // Generate random ID

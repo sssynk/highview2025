@@ -6,10 +6,15 @@ import {
   createAttendanceDispute,
   getStudentDisputes,
   setupDatabase,
+  getUpcomingSessions,
+  getSessionDetails,
+  getStudentProgressChart,
+  generateGoogleCalendarLink,
 } from '@/lib/actions';
-import { StudentAttendanceRecord, AttendanceDispute, StudentDetails } from '@/lib/types';
+import { StudentAttendanceRecord, AttendanceDispute, StudentDetails, Session, SessionWithDetails, ProgressDataPoint } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Calendar, Download, Mail, BookOpen, Link2, FileText, Video, ExternalLink } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function StudentPage() {
   const [student, setStudent] = useState<StudentDetails | null>(null);
@@ -17,6 +22,10 @@ export default function StudentPage() {
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<StudentAttendanceRecord | null>(null);
   const [disputes, setDisputes] = useState<AttendanceDispute[]>([]);
+  const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
+  const [progressData, setProgressData] = useState<ProgressDataPoint[]>([]);
+  const [selectedSessionDetails, setSelectedSessionDetails] = useState<SessionWithDetails | null>(null);
+  const [showSessionDetails, setShowSessionDetails] = useState(false);
 
   const loadStudentData = async () => {
     setLoading(true);
@@ -26,6 +35,12 @@ export default function StudentPage() {
       setStudent(data);
       const disputesData = await getStudentDisputes(studentId);
       setDisputes(disputesData);
+      
+      const upcoming = await getUpcomingSessions();
+      setUpcomingSessions(upcoming);
+      
+      const progress = await getStudentProgressChart(studentId);
+      setProgressData(progress);
     }
     setLoading(false);
   };
@@ -38,6 +53,17 @@ export default function StudentPage() {
   const handleDisputeClick = (session: StudentAttendanceRecord) => {
     setSelectedSession(session);
     setShowDisputeModal(true);
+  };
+
+  const handleViewSessionDetails = async (sessionId: string) => {
+    const details = await getSessionDetails(sessionId);
+    setSelectedSessionDetails(details);
+    setShowSessionDetails(true);
+  };
+
+  const handleAddToCalendar = async (session: Session) => {
+    const link = await generateGoogleCalendarLink(session);
+    window.open(link, '_blank');
   };
 
   const handleSubmitDispute = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -65,6 +91,21 @@ export default function StudentPage() {
     if (points === 5) return 'bg-green-100 text-green-800';
     if (points === 2.5) return 'bg-yellow-100 text-yellow-800';
     return 'bg-gray-100 text-gray-800';
+  };
+
+  const getResourceIcon = (type: string) => {
+    switch (type) {
+      case 'slide':
+        return <FileText className="h-4 w-4" />;
+      case 'link':
+        return <Link2 className="h-4 w-4" />;
+      case 'note':
+        return <BookOpen className="h-4 w-4" />;
+      case 'recording':
+        return <Video className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
+    }
   };
 
   if (loading) {
@@ -109,6 +150,83 @@ export default function StudentPage() {
           </div>
         </div>
 
+        {progressData.length > 0 && (
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-xl font-semibold mb-4">Progress Over Time</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={progressData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value: number) => [value.toFixed(1) + ' pts', 'Points']}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="cumulative_points" 
+                  stroke="#8884d8" 
+                  strokeWidth={2}
+                  name="Cumulative Points"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {upcomingSessions.length > 0 && (
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-xl font-semibold mb-4">Upcoming Sessions</h2>
+            <div className="space-y-3">
+              {upcomingSessions.map((session) => (
+                <div
+                  key={session.session_id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium">{session.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(session.date).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                    {session.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{session.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAddToCalendar(session)}
+                      className="gap-2"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Add to Calendar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewSessionDetails(session.session_id)}
+                      className="gap-2"
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      Details
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="rounded-lg border bg-card p-6">
           <h2 className="text-xl font-semibold mb-4">Attendance History</h2>
           <div className="space-y-2">
@@ -128,6 +246,15 @@ export default function StudentPage() {
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPointsBadgeColor(record.points)}`}>
                       {record.points} pts
                     </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewSessionDetails(record.session_id)}
+                      className="gap-2"
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      Details
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -218,6 +345,94 @@ export default function StudentPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showSessionDetails && selectedSessionDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg border p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-semibold">{selectedSessionDetails.name}</h2>
+                <p className="text-muted-foreground">
+                  {new Date(selectedSessionDetails.date).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSessionDetails(false)}
+              >
+                Close
+              </Button>
+            </div>
+
+            {selectedSessionDetails.description && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-2">Description</h3>
+                <p className="text-sm text-muted-foreground">{selectedSessionDetails.description}</p>
+              </div>
+            )}
+
+            {selectedSessionDetails.instructors && selectedSessionDetails.instructors.length > 0 && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-3">Instructors</h3>
+                <div className="space-y-2">
+                  {selectedSessionDetails.instructors.map((instructor) => (
+                    <div key={instructor.instructor_id} className="flex items-center gap-3 p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{instructor.first_name} {instructor.last_name}</p>
+                        <a 
+                          href={`mailto:${instructor.email}`}
+                          className="text-sm text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Mail className="h-3 w-3" />
+                          {instructor.email}
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedSessionDetails.resources && selectedSessionDetails.resources.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-3">Resources</h3>
+                <div className="space-y-2">
+                  {selectedSessionDetails.resources.map((resource) => (
+                    <div key={resource.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        {getResourceIcon(resource.type)}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{resource.title}</p>
+                        {resource.content && (
+                          <p className="text-sm text-muted-foreground">{resource.content}</p>
+                        )}
+                      </div>
+                      {resource.url && (
+                        <a 
+                          href={resource.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Open
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
