@@ -6,6 +6,16 @@ export interface Student {
   created_at?: Date;
 }
 
+export interface StudentAbsenceSummary {
+  student_id: string;
+  first_name: string;
+  last_name: string;
+  company: string;
+  email: string | null;
+  missed_sessions: number;
+  total_sessions: number;
+}
+
 export interface Session {
   session_id: string;
   name: string;
