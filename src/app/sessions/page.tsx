@@ -155,8 +155,47 @@ export default function SessionsPage() {
                       Loading attendance...
                     </div>
                   ) : sessionDetails && sessionDetails.attendance.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
+                    <>
+                      {/* Attendance Stats */}
+                      <div className="mb-4 rounded-lg bg-muted/30 p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              Attendance Rate
+                            </p>
+                            <p className="text-2xl font-bold">
+                              {(
+                                (sessionDetails.attendance.filter(
+                                  (a) => Number(a.points) === 5
+                                ).length /
+                                  sessionDetails.attendance.length) *
+                                100
+                              ).toFixed(0)}
+                              %
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">
+                              {
+                                sessionDetails.attendance.filter(
+                                  (a) => Number(a.points) === 5
+                                ).length
+                              }{' '}
+                              / {sessionDetails.attendance.length} attended
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {
+                                sessionDetails.attendance.filter(
+                                  (a) => Number(a.points) === 2.5
+                                ).length
+                              }{' '}
+                              communicated absence
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
                         <thead className="border-b bg-muted/50">
                           <tr>
                             <th className="p-3 text-left text-sm font-medium">Student</th>
@@ -277,7 +316,7 @@ export default function SessionsPage() {
                                           }),
                                     }}
                                   >
-                                    Present (2.5)
+                                    Communicated (2.5)
                                   </button>
                                   <button
                                     onClick={() =>
@@ -308,7 +347,7 @@ export default function SessionsPage() {
                                           }),
                                     }}
                                   >
-                                    Engaged (5)
+                                    Attended (5)
                                   </button>
                                 </div>
                               </td>
@@ -317,6 +356,7 @@ export default function SessionsPage() {
                         </tbody>
                       </table>
                     </div>
+                    </>
                   ) : (
                     <div className="py-8 text-center text-muted-foreground">
                       No students enrolled yet. Add students to track attendance.

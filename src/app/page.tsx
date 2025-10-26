@@ -8,6 +8,7 @@ interface DashboardStats {
   totalStudents: number;
   totalSessions: number;
   averagePoints: string;
+  averageAttendance: string;
   topStudents: Array<{
     student_id: string;
     first_name: string;
@@ -22,6 +23,7 @@ export default function DashboardPage() {
     totalStudents: 0,
     totalSessions: 0,
     averagePoints: '0',
+    averageAttendance: '0',
     topStudents: [],
   });
   const [loading, setLoading] = useState(true);
@@ -84,8 +86,8 @@ export default function DashboardPage() {
           <div className="rounded-lg border bg-card p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Average Points</p>
-                <p className="mt-2 text-3xl font-bold">{stats.averagePoints}</p>
+                <p className="text-sm font-medium text-muted-foreground">Avg Attendance</p>
+                <p className="mt-2 text-3xl font-bold">{stats.averageAttendance}%</p>
               </div>
               <div className="rounded-full bg-green-500/10 p-3">
                 <TrendingUp className="h-6 w-6 text-green-500" />
@@ -96,8 +98,8 @@ export default function DashboardPage() {
           <div className="rounded-lg border bg-card p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Top Performers</p>
-                <p className="mt-2 text-3xl font-bold">{stats.topStudents.length}</p>
+                <p className="text-sm font-medium text-muted-foreground">Avg Points</p>
+                <p className="mt-2 text-3xl font-bold">{stats.averagePoints}</p>
               </div>
               <div className="rounded-full bg-yellow-500/10 p-3">
                 <Award className="h-6 w-6 text-yellow-500" />

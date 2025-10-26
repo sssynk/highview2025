@@ -45,7 +45,7 @@ export async function getStudentsWithPoints(): Promise<StudentWithPoints[]> {
         COALESCE(SUM(sa.points), 0) as total_session_points,
         COALESCE(SUM(ep.points), 0) as total_extra_points,
         COALESCE(SUM(sa.points), 0) + COALESCE(SUM(ep.points), 0) as total_points,
-        COUNT(DISTINCT CASE WHEN sa.points > 0 THEN sa.session_id END) as sessions_attended,
+        COUNT(DISTINCT CASE WHEN sa.points = 5 THEN sa.session_id END) as sessions_attended,
         COUNT(DISTINCT sess.session_id) as total_sessions
       FROM students s
       LEFT JOIN session_attendance sa ON s.student_id = sa.student_id
@@ -334,11 +334,23 @@ export async function getDashboardStats() {
       ORDER BY total_points DESC
       LIMIT 5
     `);
+    
+    // Calculate average attendance rate (only counting 5 points as attended)
+    const attendanceResult = await query(`
+      SELECT 
+        CASE 
+          WHEN COUNT(*) > 0 THEN
+            (COUNT(CASE WHEN points = 5 THEN 1 END)::float / COUNT(*)::float * 100)
+          ELSE 0
+        END as avg_attendance_rate
+      FROM session_attendance
+    `);
 
     return {
       totalStudents: parseInt(studentsResult.rows[0].count),
       totalSessions: parseInt(sessionsResult.rows[0].count),
       averagePoints: parseFloat(avgPointsResult.rows[0].avg_points || 0).toFixed(1),
+      averageAttendance: parseFloat(attendanceResult.rows[0].avg_attendance_rate || 0).toFixed(1),
       topStudents: topStudentsResult.rows,
     };
   } catch (error) {
@@ -347,6 +359,7 @@ export async function getDashboardStats() {
       totalStudents: 0,
       totalSessions: 0,
       averagePoints: '0',
+      averageAttendance: '0',
       topStudents: [],
     };
   }
