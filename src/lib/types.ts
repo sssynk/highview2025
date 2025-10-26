@@ -47,6 +47,33 @@ export interface SessionWithAttendance extends Session {
   }[];
 }
 
+export interface AttendanceDispute {
+  id?: number;
+  student_id: string;
+  session_id: string;
+  message?: string;
+  status: 'pending' | 'reviewed' | 'resolved';
+  created_at?: Date;
+  resolved_at?: Date;
+  instructor_response?: string;
+  session_name?: string;
+  date?: string;
+}
+
+export interface StudentAttendanceRecord {
+  session_id: string;
+  session_name: string;
+  date: string;
+  points: number;
+}
+
+export interface StudentDetails extends Student {
+  attendance: StudentAttendanceRecord[];
+  total_session_points: number;
+  total_extra_points: number;
+  total_points: number;
+}
+
 // Generate random ID
 export function generateId(prefix: string): string {
   const timestamp = Date.now().toString(36);

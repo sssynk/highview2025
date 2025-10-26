@@ -11,7 +11,7 @@ const pool = new Pool({
   }
 });
 
-export const query = async (text: string, params?: any[]) => {
+export const query = async (text: string, params?: unknown[]) => {
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
@@ -76,6 +76,20 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    // Create attendance_disputes table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS attendance_disputes (
+        id SERIAL PRIMARY KEY,
+        student_id VARCHAR(50) REFERENCES students(student_id) ON DELETE CASCADE,
+        session_id VARCHAR(50) REFERENCES sessions(session_id) ON DELETE CASCADE,
+        message TEXT,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'resolved')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resolved_at TIMESTAMP,
+        instructor_response TEXT
+      )
+    `);
+
     // Create indexes for better query performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_session_attendance_student 
@@ -90,6 +104,11 @@ export const initializeDatabase = async () => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_extra_points_student 
       ON extra_points(student_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_attendance_disputes_student 
+      ON attendance_disputes(student_id)
     `);
 
     await client.query('COMMIT');

@@ -9,6 +9,8 @@ import {
   StudentWithPoints,
   SessionWithAttendance,
   generateId,
+  AttendanceDispute,
+  StudentAttendanceRecord,
 } from './types';
 import { revalidatePath } from 'next/cache';
 
@@ -57,6 +59,104 @@ export async function getStudentsWithPoints(): Promise<StudentWithPoints[]> {
     return result.rows;
   } catch (error) {
     console.error('Error fetching students with points:', error);
+    return [];
+  }
+}
+
+export async function getStudentAttendance(student_id: string): Promise<StudentAttendanceRecord[]> {
+  try {
+    const result = await query(`
+      SELECT 
+        s.session_id,
+        s.name as session_name,
+        s.date,
+        sa.points
+      FROM sessions s
+      LEFT JOIN session_attendance sa ON s.session_id = sa.session_id AND sa.student_id = $1
+      ORDER BY s.date DESC
+    `, [student_id]);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching student attendance:', error);
+    return [];
+  }
+}
+
+export async function getStudentWithDetails(student_id: string) {
+  try {
+    const studentResult = await query(
+      'SELECT * FROM students WHERE student_id = $1',
+      [student_id]
+    );
+
+    if (studentResult.rows.length === 0) {
+      return null;
+    }
+
+    const student = studentResult.rows[0];
+    const attendance = await getStudentAttendance(student_id);
+    
+    const pointsResult = await query(`
+      SELECT 
+        COALESCE(SUM(sa.points), 0) as total_session_points,
+        COALESCE(SUM(ep.points), 0) as total_extra_points
+      FROM students s
+      LEFT JOIN session_attendance sa ON s.student_id = sa.student_id
+      LEFT JOIN extra_points ep ON s.student_id = ep.student_id
+      WHERE s.student_id = $1
+      GROUP BY s.student_id
+    `, [student_id]);
+
+    const totalSessionPoints = parseFloat(pointsResult.rows[0]?.total_session_points || 0);
+    const totalExtraPoints = parseFloat(pointsResult.rows[0]?.total_extra_points || 0);
+
+    return {
+      ...student,
+      attendance,
+      total_session_points: totalSessionPoints,
+      total_extra_points: totalExtraPoints,
+      total_points: totalSessionPoints + totalExtraPoints,
+    };
+  } catch (error) {
+    console.error('Error fetching student details:', error);
+    return null;
+  }
+}
+
+export async function createAttendanceDispute(data: {
+  student_id: string;
+  session_id: string;
+  message: string;
+}) {
+  try {
+    await query(
+      'INSERT INTO attendance_disputes (student_id, session_id, message) VALUES ($1, $2, $3)',
+      [data.student_id, data.session_id, data.message]
+    );
+    revalidatePath('/student');
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating attendance dispute:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function getStudentDisputes(student_id: string): Promise<AttendanceDispute[]> {
+  try {
+    const result = await query(
+      `SELECT 
+        ad.*,
+        s.name as session_name,
+        s.date
+      FROM attendance_disputes ad
+      JOIN sessions s ON ad.session_id = s.session_id
+      WHERE ad.student_id = $1
+      ORDER BY ad.created_at DESC`,
+      [student_id]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching student disputes:', error);
     return [];
   }
 }
