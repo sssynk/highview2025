@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard App",
-  description: "A simple dashboard application",
+  title: "Highview - Student Management",
+  description: "Track student attendance and engagement",
 };
 
 export default function RootLayout({

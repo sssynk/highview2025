@@ -1,36 +1,148 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Highview Student Management System
 
-## Getting Started
+A comprehensive student attendance and engagement tracking system built with Next.js 14, TypeScript, and PostgreSQL.
 
-First, run the development server:
+## 🚀 Quick Start
+
+### 1. Create Environment File
+
+Create `.env.local` in the project root:
+
+```env
+DB_HOST=database-1-instance-1.cziyo8qqeu6x.us-east-1.rds.amazonaws.com
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=AWSINRIX123
+```
+
+### 2. Run Database Migration
+
+**This creates all database tables (run once):**
+
+```bash
+npm run migrate
+```
+
+### 3. Start Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ✨ Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- 📊 **Dashboard** - View statistics and top performers
+- 👥 **Student Management** - Add, import from CSV, manage students
+- 📅 **Session Management** - Create sessions and track attendance
+- ⭐ **Points System** - Award 0, 2.5, or 5 points based on engagement
+- 🏆 **Extra Points** - Award bonus points for achievements
+- 📈 **Leaderboard** - Real-time rankings and statistics
 
-## Learn More
+## 📖 Documentation
 
-To learn more about Next.js, take a look at the following resources:
+- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Database setup instructions
+- **[SETUP.md](SETUP.md)** - Complete feature guide and usage
+- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Detailed project documentation
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🎯 Quick Usage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Import Sample Students
 
-## Deploy on Vercel
+1. Go to `/students`
+2. Click "Import CSV"
+3. Upload `sample-students.csv`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Create a Session
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Go to `/sessions`
+2. Click "Add Session"
+3. Enter name and date
+
+### Mark Attendance
+
+1. Go to `/sessions`
+2. Click "Attendance" on any session
+3. Select points for each student:
+   - **0** = Absent
+   - **2.5** = Present
+   - **5** = Engaged
+
+## 📦 Project Structure
+
+```
+src/
+├── app/
+│   ├── page.tsx              # Dashboard
+│   ├── students/page.tsx     # Student management
+│   ├── sessions/page.tsx     # Session & attendance
+│   └── layout.tsx            # Root layout
+├── components/
+│   ├── sidebar.tsx           # Navigation
+│   └── ui/                   # UI components
+└── lib/
+    ├── db.ts                 # Database connection
+    ├── types.ts              # TypeScript types
+    └── actions.ts            # Server actions
+```
+
+## 🛠️ Tech Stack
+
+- **Framework:** Next.js 14 (App Router)
+- **Language:** TypeScript
+- **Database:** PostgreSQL (Amazon RDS)
+- **Styling:** Tailwind CSS
+- **UI Components:** shadcn/ui
+- **Icons:** Lucide React
+
+## 📝 Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run migrate` - Run database migrations
+- `npm run lint` - Run ESLint
+
+## 🗄️ Database Schema
+
+- **students** - Student profiles
+- **sessions** - Session information
+- **session_attendance** - Attendance tracking with points
+- **extra_points** - Additional points from other sources
+
+All tables have proper indexes, foreign keys, and constraints.
+
+## 🔒 Security
+
+- Database credentials in `.env.local` (gitignored)
+- SSL connection to RDS
+- Server-side validation
+- Type-safe operations
+
+## 🐛 Troubleshooting
+
+### "relation does not exist" error?
+Run the migration script: `npm run migrate`
+
+### Can't connect to database?
+- Check `.env.local` has correct credentials
+- Verify RDS security group allows your IP
+- Confirm RDS instance is running
+
+### Need to reset database?
+See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md#need-to-reset)
+
+## 📚 Learn More
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [TypeScript Documentation](https://www.typescriptlang.org/docs/)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+
+## 🎉 You're Ready!
+
+After running the migration, your database is set up and you can start tracking student attendance!
+
+For detailed usage instructions, see [SETUP.md](SETUP.md).
