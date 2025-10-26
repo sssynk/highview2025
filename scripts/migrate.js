@@ -27,9 +27,32 @@ async function runMigrations() {
   try {
     console.log('🚀 Starting database migration...\n');
     
+    // Check if users table exists without role column and drop it
+    try {
+      const checkRole = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name='users' AND column_name='role'
+      `);
+      if (checkRole.rows.length === 0) {
+        const checkTable = await client.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'users'
+          );
+        `);
+        if (checkTable.rows[0].exists) {
+          console.log('⚠️  Dropping old users table without role column...');
+          await client.query('DROP TABLE users CASCADE');
+          console.log('✅ Old users table dropped\n');
+        }
+      }
+    } catch (e) {
+      // Table doesn't exist yet, that's fine
+    }
+    
     await client.query('BEGIN');
 
-    // Create students table
+    // Create students table first (users will reference it)
     console.log('📋 Creating students table...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS students (
@@ -41,6 +64,40 @@ async function runMigrations() {
       )
     `);
     console.log('✅ Students table created\n');
+
+    // Create users table
+    console.log('📋 Creating users table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT NULL,
+        student_id VARCHAR(50) REFERENCES students(student_id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CHECK (role IN ('admin', 'professor', 'student') OR role IS NULL)
+      )
+    `);
+    
+    // Add student_id column if it doesn't exist (for existing tables)
+    try {
+      const checkColumn = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name='users' AND column_name='student_id'
+      `);
+      if (checkColumn.rows.length === 0) {
+        console.log('📋 Adding student_id column to users table...');
+        await client.query(`
+          ALTER TABLE users 
+          ADD COLUMN student_id VARCHAR(50) REFERENCES students(student_id) ON DELETE SET NULL
+        `);
+        console.log('✅ student_id column added\n');
+      }
+    } catch (e) {
+      console.log('⚠️  student_id column may already exist\n');
+    }
+    console.log('✅ Users table created\n');
 
     // Create sessions table
     console.log('📋 Creating sessions table...');
@@ -95,6 +152,18 @@ async function runMigrations() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_extra_points_student 
       ON extra_points(student_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_email 
+      ON users(email)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_role 
+      ON users(role)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_student 
+      ON users(student_id)
     `);
     console.log('✅ Indexes created\n');
 
