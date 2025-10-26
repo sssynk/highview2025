@@ -82,13 +82,6 @@ export default function SessionsPage() {
     loadSessions();
   };
 
-  const getPointsColor = (points: number) => {
-    if (points === 0) return 'bg-red-500/10 text-red-600 border-red-500/20';
-    if (points === 2.5) return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
-    if (points === 5) return 'bg-green-500/10 text-green-600 border-green-500/20';
-    return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
-  };
-
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -187,18 +180,44 @@ export default function SessionsPage() {
                               </td>
                               <td className="p-3 text-center">
                                 <span
-                                  className={`inline-block rounded-full border px-3 py-1 text-sm font-medium ${getPointsColor(
-                                    att.points
-                                  )}`}
+                                  style={{
+                                    display: 'inline-block',
+                                    borderRadius: '9999px',
+                                    border: '1px solid',
+                                    padding: '4px 12px',
+                                    fontSize: '14px',
+                                    fontWeight: 500,
+                                    ...(Number(att.points) === 0
+                                      ? {
+                                          backgroundColor: '#dc2626',
+                                          borderColor: '#dc2626',
+                                          color: 'white',
+                                        }
+                                      : Number(att.points) === 2.5
+                                      ? {
+                                          backgroundColor: '#eab308',
+                                          borderColor: '#eab308',
+                                          color: 'white',
+                                        }
+                                      : Number(att.points) === 5
+                                      ? {
+                                          backgroundColor: '#16a34a',
+                                          borderColor: '#16a34a',
+                                          color: 'white',
+                                        }
+                                      : {
+                                          backgroundColor: '#f3f4f6',
+                                          borderColor: '#d1d5db',
+                                          color: '#374151',
+                                        }),
+                                  }}
                                 >
                                   {att.points} pts
                                 </span>
                               </td>
                               <td className="p-3">
                                 <div className="flex justify-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant={att.points === 0 ? 'default' : 'outline'}
+                                  <button
                                     onClick={() =>
                                       handleUpdateAttendance(
                                         att.student_id,
@@ -206,17 +225,30 @@ export default function SessionsPage() {
                                         0
                                       )
                                     }
-                                    className={
-                                      att.points === 0
-                                        ? 'bg-red-600 hover:bg-red-700'
-                                        : ''
-                                    }
+                                    style={{
+                                      padding: '6px 12px',
+                                      fontSize: '14px',
+                                      fontWeight: 500,
+                                      borderRadius: '6px',
+                                      border: '1px solid',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      ...(Number(att.points) === 0
+                                        ? {
+                                            backgroundColor: '#dc2626',
+                                            borderColor: '#dc2626',
+                                            color: 'white',
+                                          }
+                                        : {
+                                            backgroundColor: 'white',
+                                            borderColor: '#d1d5db',
+                                            color: '#374151',
+                                          }),
+                                    }}
                                   >
                                     Absent (0)
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant={att.points === 2.5 ? 'default' : 'outline'}
+                                  </button>
+                                  <button
                                     onClick={() =>
                                       handleUpdateAttendance(
                                         att.student_id,
@@ -224,17 +256,30 @@ export default function SessionsPage() {
                                         2.5
                                       )
                                     }
-                                    className={
-                                      att.points === 2.5
-                                        ? 'bg-yellow-600 hover:bg-yellow-700'
-                                        : ''
-                                    }
+                                    style={{
+                                      padding: '6px 12px',
+                                      fontSize: '14px',
+                                      fontWeight: 500,
+                                      borderRadius: '6px',
+                                      border: '1px solid',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      ...(Number(att.points) === 2.5
+                                        ? {
+                                            backgroundColor: '#eab308',
+                                            borderColor: '#eab308',
+                                            color: 'white',
+                                          }
+                                        : {
+                                            backgroundColor: 'white',
+                                            borderColor: '#d1d5db',
+                                            color: '#374151',
+                                          }),
+                                    }}
                                   >
                                     Present (2.5)
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant={att.points === 5 ? 'default' : 'outline'}
+                                  </button>
+                                  <button
                                     onClick={() =>
                                       handleUpdateAttendance(
                                         att.student_id,
@@ -242,14 +287,29 @@ export default function SessionsPage() {
                                         5
                                       )
                                     }
-                                    className={
-                                      att.points === 5
-                                        ? 'bg-green-600 hover:bg-green-700'
-                                        : ''
-                                    }
+                                    style={{
+                                      padding: '6px 12px',
+                                      fontSize: '14px',
+                                      fontWeight: 500,
+                                      borderRadius: '6px',
+                                      border: '1px solid',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      ...(Number(att.points) === 5
+                                        ? {
+                                            backgroundColor: '#16a34a',
+                                            borderColor: '#16a34a',
+                                            color: 'white',
+                                          }
+                                        : {
+                                            backgroundColor: 'white',
+                                            borderColor: '#d1d5db',
+                                            color: '#374151',
+                                          }),
+                                    }}
                                   >
                                     Engaged (5)
-                                  </Button>
+                                  </button>
                                 </div>
                               </td>
                             </tr>
