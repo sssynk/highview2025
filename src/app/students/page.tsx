@@ -13,7 +13,7 @@ import {
 } from '@/lib/actions';
 import { StudentWithPoints, ExtraPoints } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Plus, Upload, Trash2, Award } from 'lucide-react';
+import { Plus, Upload, Trash2, Award, Mail } from 'lucide-react';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<StudentWithPoints[]>([]);
@@ -21,6 +21,7 @@ export default function StudentsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExtraPointsModal, setShowExtraPointsModal] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentWithPoints | null>(null);
   const [extraPoints, setExtraPoints] = useState<ExtraPoints[]>([]);
 
@@ -92,6 +93,31 @@ export default function StudentsPage() {
     setShowExtraPointsModal(true);
   };
 
+  const handleShowFollowUp = (student: StudentWithPoints) => {
+    setSelectedStudent(student);
+    setShowFollowUpModal(true);
+  };
+
+  const handleAddFollowUpPoints = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+
+    const formData = new FormData(e.currentTarget);
+    const points = parseFloat(formData.get('points') as string);
+    
+    const result = await addExtraPoints({
+      student_id: selectedStudent.student_id,
+      source: 'Follow-up Email',
+      points: points,
+    });
+
+    if (result.success) {
+      setShowFollowUpModal(false);
+      loadStudents();
+      (e.target as HTMLFormElement).reset();
+    }
+  };
+
   const handleAddExtraPoints = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedStudent) return;
@@ -135,8 +161,8 @@ export default function StudentsPage() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Students</h1>
-            <p className="mt-2 text-muted-foreground">
+      <h1 className="text-3xl font-bold">Students</h1>
+      <p className="mt-2 text-muted-foreground">
               Manage students and track their progress
             </p>
           </div>
@@ -195,14 +221,24 @@ export default function StudentsPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleShowExtraPoints(student)}
+                          onClick={() => handleShowFollowUp(student)}
+                          title="Follow-up Points"
                         >
-                          <Award className="h-4 w-4" />
+                          <Mail className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleShowExtraPoints(student)}
+                          title="Extra Points"
+                        >
+                          <Award className="h-4 w-4 text-yellow-600" />
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleDelete(student.student_id)}
+                          title="Delete Student"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -383,6 +419,64 @@ export default function StudentsPage() {
             <div className="flex justify-end">
               <Button onClick={() => setShowExtraPointsModal(false)}>Close</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Follow-Up Points Modal */}
+      {showFollowUpModal && selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-lg border bg-card p-6">
+            <h2 className="mb-4 text-xl font-bold">
+              Award Follow-Up Points
+            </h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Award points to {selectedStudent.first_name} {selectedStudent.last_name} for completing a follow-up email.
+            </p>
+            
+            <form onSubmit={handleAddFollowUpPoints} className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium">Points</label>
+                <input
+                  type="number"
+                  name="points"
+                  step="0.5"
+                  min="0"
+                  defaultValue="5"
+                  required
+                  className="w-full rounded-md border bg-background px-3 py-2"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Default: 5 points per follow-up email
+                </p>
+              </div>
+              
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-sm">
+                  <strong>Student:</strong> {selectedStudent.first_name} {selectedStudent.last_name}
+                </p>
+                <p className="text-sm">
+                  <strong>Company:</strong> {selectedStudent.company}
+                </p>
+                <p className="text-sm">
+                  <strong>Current Total:</strong> {selectedStudent.total_points} points
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowFollowUpModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  <Mail className="mr-2 h-4 w-4" />
+                  Award Points
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

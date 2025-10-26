@@ -1,19 +1,95 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Calendar, Users } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Home, Calendar, Users, Shield, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const navigation = [
-  { name: "Dashboard", href: "/", icon: Home },
-  { name: "Sessions", href: "/sessions", icon: Calendar },
-  { name: "Students", href: "/students", icon: Users },
-];
+import { getSession, logout, type Session } from "@/lib/auth";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSession();
+  }, []);
+
+  const loadSession = async () => {
+    const sessionData = await getSession();
+    setSession(sessionData);
+    setLoading(false);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+    router.refresh();
+  };
+
+  // Navigation based on role
+  const getNavigation = () => {
+    if (!session?.role) return [];
+
+    const baseNav = [
+      { name: "Dashboard", href: "/", icon: Home },
+      { name: "Sessions", href: "/sessions", icon: Calendar },
+      { name: "Students", href: "/students", icon: Users },
+    ];
+
+    if (session.role === 'admin') {
+      return [
+        ...baseNav,
+        { name: "User Management", href: "/admin", icon: Shield },
+      ];
+    }
+
+    if (session.role === 'professor') {
+      return baseNav;
+    }
+
+    return []; // Students have no sidebar nav
+  };
+
+  const navigation = getNavigation();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-64 flex-col border-r bg-background">
+        <div className="flex h-16 items-center justify-center border-b">
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Student portal has no sidebar
+  if (session?.role === 'student') {
+    return null;
+  }
+
+  const getInitials = (email: string) => {
+    return email
+      .split('@')[0]
+      .split('.')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getRoleBadge = (role: string) => {
+    const styles = {
+      admin: 'bg-red-600 text-white',
+      professor: 'bg-blue-600 text-white',
+      student: 'bg-green-600 text-white',
+    };
+    return styles[role as keyof typeof styles] || 'bg-gray-500 text-white';
+  };
 
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-background">
@@ -43,11 +119,15 @@ export function Sidebar() {
       <div className="border-b p-6">
         <div className="flex flex-col items-center gap-2">
           <Avatar className="h-16 w-16">
-            <AvatarImage src="/avatar.jpg" alt="User" />
-            <AvatarFallback>JD</AvatarFallback>
+            <AvatarFallback>{session ? getInitials(session.email) : 'U'}</AvatarFallback>
           </Avatar>
           <div className="text-center">
-            <p className="text-sm font-medium">John Doe</p>
+            <p className="text-sm font-medium">{session?.email}</p>
+            {session?.role && (
+              <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${getRoleBadge(session.role)}`}>
+                {session.role.charAt(0).toUpperCase() + session.role.slice(1)}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -73,6 +153,18 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Logout Button */}
+      <div className="border-t p-4">
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleLogout}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
+      </div>
     </div>
   );
 }

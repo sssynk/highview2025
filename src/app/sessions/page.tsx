@@ -7,10 +7,11 @@ import {
   addSession,
   deleteSession,
   updateAttendance,
+  addExtraPoints,
 } from '@/lib/actions';
 import { Session, SessionWithAttendance } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Users, ChevronDown, ChevronUp, Star } from 'lucide-react';
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -19,6 +20,7 @@ export default function SessionsPage() {
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [sessionDetails, setSessionDetails] = useState<SessionWithAttendance | null>(null);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [participationPoints, setParticipationPoints] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     loadSessions();
@@ -82,6 +84,33 @@ export default function SessionsPage() {
     loadSessions();
   };
 
+  const handleAddParticipationPoints = async (
+    student_id: string,
+    session_id: string,
+    sessionName: string
+  ) => {
+    const key = `${student_id}-${session_id}`;
+    const points = parseFloat(participationPoints[key] || '0');
+    
+    if (points <= 0) {
+      alert('Please enter a valid point value');
+      return;
+    }
+
+    const result = await addExtraPoints({
+      student_id,
+      source: `Participation - ${sessionName}`,
+      points,
+    });
+
+    if (result.success) {
+      // Clear the input
+      setParticipationPoints(prev => ({ ...prev, [key]: '' }));
+      // Reload to show updated totals
+      loadSessions();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -95,8 +124,8 @@ export default function SessionsPage() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Sessions</h1>
-            <p className="mt-2 text-muted-foreground">
+      <h1 className="text-3xl font-bold">Sessions</h1>
+      <p className="mt-2 text-muted-foreground">
               Manage sessions and track student attendance
             </p>
           </div>
@@ -155,8 +184,47 @@ export default function SessionsPage() {
                       Loading attendance...
                     </div>
                   ) : sessionDetails && sessionDetails.attendance.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
+                    <>
+                      {/* Attendance Stats */}
+                      <div className="mb-4 rounded-lg bg-muted/30 p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              Attendance Rate
+                            </p>
+                            <p className="text-2xl font-bold">
+                              {(
+                                (sessionDetails.attendance.filter(
+                                  (a) => Number(a.points) === 5
+                                ).length /
+                                  sessionDetails.attendance.length) *
+                                100
+                              ).toFixed(0)}
+                              %
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">
+                              {
+                                sessionDetails.attendance.filter(
+                                  (a) => Number(a.points) === 5
+                                ).length
+                              }{' '}
+                              / {sessionDetails.attendance.length} attended
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {
+                                sessionDetails.attendance.filter(
+                                  (a) => Number(a.points) === 2.5
+                                ).length
+                              }{' '}
+                              communicated absence
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
                         <thead className="border-b bg-muted/50">
                           <tr>
                             <th className="p-3 text-left text-sm font-medium">Student</th>
@@ -166,6 +234,9 @@ export default function SessionsPage() {
                             </th>
                             <th className="p-3 text-center text-sm font-medium">
                               Mark Attendance
+                            </th>
+                            <th className="p-3 text-center text-sm font-medium">
+                              Participation Points
                             </th>
                           </tr>
                         </thead>
@@ -277,7 +348,7 @@ export default function SessionsPage() {
                                           }),
                                     }}
                                   >
-                                    Present (2.5)
+                                    Communicated (2.5)
                                   </button>
                                   <button
                                     onClick={() =>
@@ -308,7 +379,38 @@ export default function SessionsPage() {
                                           }),
                                     }}
                                   >
-                                    Engaged (5)
+                                    Attended (5)
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center justify-center gap-2">
+                                  <input
+                                    type="number"
+                                    step="0.5"
+                                    min="0"
+                                    placeholder="0"
+                                    value={participationPoints[`${att.student_id}-${session.session_id}`] || ''}
+                                    onChange={(e) => 
+                                      setParticipationPoints(prev => ({
+                                        ...prev,
+                                        [`${att.student_id}-${session.session_id}`]: e.target.value
+                                      }))
+                                    }
+                                    className="w-20 rounded-md border bg-background px-2 py-1 text-center text-sm"
+                                  />
+                                  <button
+                                    onClick={() =>
+                                      handleAddParticipationPoints(
+                                        att.student_id,
+                                        session.session_id,
+                                        session.name
+                                      )
+                                    }
+                                    className="rounded-md border border-purple-600 bg-purple-600 px-2 py-1 text-white hover:bg-purple-700"
+                                    title="Add participation points"
+                                  >
+                                    <Star className="h-4 w-4" />
                                   </button>
                                 </div>
                               </td>
@@ -317,6 +419,7 @@ export default function SessionsPage() {
                         </tbody>
                       </table>
                     </div>
+                    </>
                   ) : (
                     <div className="py-8 text-center text-muted-foreground">
                       No students enrolled yet. Add students to track attendance.
