@@ -31,7 +31,7 @@ export async function getStudentsMissingSessions(
           s.last_name,
           s.company,
           u.email
-        HAVING COUNT(sa.session_id) FILTER (WHERE sa.points = 0) > $1
+        HAVING COUNT(sa.session_id) FILTER (WHERE sa.points = 0) >= $1
         ORDER BY
           missed_sessions DESC,
           s.last_name,
@@ -78,7 +78,7 @@ export async function sendMissedSessionEmails() {
   if (students.length === 0) {
     return {
       success: false as const,
-      error: 'No students have missed more than two sessions.',
+      error: 'No students have missed at least two sessions.',
       skipped: 0,
       attempted: 0,
       sent: 0,
@@ -148,4 +148,3 @@ export async function sendMissedSessionEmails() {
         : `Sent ${sent} emails, ${failures} failed. Check logs for details.`,
   };
 }
-

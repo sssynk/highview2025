@@ -44,16 +44,27 @@ export async function getStudentsWithPoints(): Promise<StudentWithPoints[]> {
     const result = await query(`
       SELECT 
         s.*,
-        COALESCE(SUM(sa.points), 0) as total_session_points,
-        COALESCE(SUM(ep.points), 0) as total_extra_points,
-        COALESCE(SUM(sa.points), 0) + COALESCE(SUM(ep.points), 0) as total_points,
-        COUNT(DISTINCT CASE WHEN sa.points = 5 THEN sa.session_id END) as sessions_attended,
-        COUNT(DISTINCT sess.session_id) as total_sessions
+        COALESCE(sa.total_session_points, 0) as total_session_points,
+        COALESCE(ep.total_extra_points, 0) as total_extra_points,
+        COALESCE(sa.total_session_points, 0) + COALESCE(ep.total_extra_points, 0) as total_points,
+        COALESCE(sa.sessions_attended, 0) as sessions_attended,
+        (SELECT COUNT(*) FROM sessions) as total_sessions
       FROM students s
-      LEFT JOIN session_attendance sa ON s.student_id = sa.student_id
-      LEFT JOIN extra_points ep ON s.student_id = ep.student_id
-      LEFT JOIN sessions sess ON 1=1
-      GROUP BY s.student_id, s.first_name, s.last_name, s.company, s.created_at
+      LEFT JOIN (
+        SELECT 
+          student_id,
+          SUM(points) as total_session_points,
+          COUNT(DISTINCT CASE WHEN points = 5 THEN session_id END) as sessions_attended
+        FROM session_attendance
+        GROUP BY student_id
+      ) sa ON s.student_id = sa.student_id
+      LEFT JOIN (
+        SELECT 
+          student_id,
+          SUM(points) as total_extra_points
+        FROM extra_points
+        GROUP BY student_id
+      ) ep ON s.student_id = ep.student_id
       ORDER BY total_points DESC, s.last_name, s.first_name
     `);
     return result.rows;
@@ -445,16 +456,28 @@ export async function getDashboardStats() {
     const studentsResult = await query('SELECT COUNT(*) FROM students');
     const sessionsResult = await query('SELECT COUNT(*) FROM sessions');
     const avgPointsResult = await query(`
-      SELECT AVG(total_points) as avg_points
-      FROM (
+      WITH student_totals AS (
         SELECT 
           s.student_id,
-          COALESCE(SUM(sa.points), 0) + COALESCE(SUM(ep.points), 0) as total_points
+          COALESCE(sa.total_session_points, 0) + COALESCE(ep.total_extra_points, 0) as total_points
         FROM students s
-        LEFT JOIN session_attendance sa ON s.student_id = sa.student_id
-        LEFT JOIN extra_points ep ON s.student_id = ep.student_id
-        GROUP BY s.student_id
-      ) AS student_totals
+        LEFT JOIN (
+          SELECT 
+            student_id, 
+            SUM(points) as total_session_points
+          FROM session_attendance
+          GROUP BY student_id
+        ) sa ON s.student_id = sa.student_id
+        LEFT JOIN (
+          SELECT 
+            student_id, 
+            SUM(points) as total_extra_points
+          FROM extra_points
+          GROUP BY student_id
+        ) ep ON s.student_id = ep.student_id
+      )
+      SELECT AVG(total_points) as avg_points
+      FROM student_totals
     `);
     const topStudentsResult = await query(`
       SELECT 
@@ -462,12 +485,23 @@ export async function getDashboardStats() {
         s.first_name,
         s.last_name,
         s.company,
-        COALESCE(SUM(sa.points), 0) + COALESCE(SUM(ep.points), 0) as total_points
+        COALESCE(sa.total_session_points, 0) + COALESCE(ep.total_extra_points, 0) as total_points
       FROM students s
-      LEFT JOIN session_attendance sa ON s.student_id = sa.student_id
-      LEFT JOIN extra_points ep ON s.student_id = ep.student_id
-      GROUP BY s.student_id, s.first_name, s.last_name, s.company
-      ORDER BY total_points DESC
+      LEFT JOIN (
+        SELECT 
+          student_id,
+          SUM(points) as total_session_points
+        FROM session_attendance
+        GROUP BY student_id
+      ) sa ON s.student_id = sa.student_id
+      LEFT JOIN (
+        SELECT 
+          student_id,
+          SUM(points) as total_extra_points
+        FROM extra_points
+        GROUP BY student_id
+      ) ep ON s.student_id = ep.student_id
+      ORDER BY total_points DESC, s.last_name, s.first_name
       LIMIT 5
     `);
     
@@ -509,17 +543,28 @@ export async function getStudentWithDetails(studentId: string) {
     const studentsResult = await query(`
       SELECT 
         s.*,
-        COALESCE(SUM(sa.points), 0) as total_session_points,
-        COALESCE(SUM(ep.points), 0) as total_extra_points,
-        COALESCE(SUM(sa.points), 0) + COALESCE(SUM(ep.points), 0) as total_points,
-        COUNT(DISTINCT CASE WHEN sa.points = 5 THEN sa.session_id END) as sessions_attended,
-        COUNT(DISTINCT sess.session_id) as total_sessions
+        COALESCE(sa.total_session_points, 0) as total_session_points,
+        COALESCE(ep.total_extra_points, 0) as total_extra_points,
+        COALESCE(sa.total_session_points, 0) + COALESCE(ep.total_extra_points, 0) as total_points,
+        COALESCE(sa.sessions_attended, 0) as sessions_attended,
+        (SELECT COUNT(*) FROM sessions) as total_sessions
       FROM students s
-      LEFT JOIN session_attendance sa ON s.student_id = sa.student_id
-      LEFT JOIN extra_points ep ON s.student_id = ep.student_id
-      LEFT JOIN sessions sess ON 1=1
+      LEFT JOIN (
+        SELECT 
+          student_id,
+          SUM(points) as total_session_points,
+          COUNT(DISTINCT CASE WHEN points = 5 THEN session_id END) as sessions_attended
+        FROM session_attendance
+        GROUP BY student_id
+      ) sa ON s.student_id = sa.student_id
+      LEFT JOIN (
+        SELECT 
+          student_id,
+          SUM(points) as total_extra_points
+        FROM extra_points
+        GROUP BY student_id
+      ) ep ON s.student_id = ep.student_id
       WHERE s.student_id = $1
-      GROUP BY s.student_id, s.first_name, s.last_name, s.company, s.created_at
     `, [studentId]);
 
     if (studentsResult.rows.length === 0) {
