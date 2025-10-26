@@ -47,7 +47,7 @@ export function middleware(request: NextRequest) {
       }
 
       // Dashboard, sessions, students - accessible by admin and professor
-      const restrictedRoutes = ['/', '/sessions', '/students'];
+      const restrictedRoutes = ['/', '/sessions', '/students', '/workflow'];
       if (restrictedRoutes.includes(pathname)) {
         if (sessionData.role === 'student') {
           return NextResponse.redirect(new URL('/student-portal', request.url));

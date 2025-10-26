@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Calendar, Users, Shield, LogOut } from "lucide-react";
+import { Home, Calendar, Users, Shield, LogOut, Send } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,7 @@ export function Sidebar() {
       { name: "Dashboard", href: "/", icon: Home },
       { name: "Sessions", href: "/sessions", icon: Calendar },
       { name: "Students", href: "/students", icon: Users },
+      { name: "Workflow", href: "/workflow", icon: Send },
     ];
 
     if (session.role === 'admin') {
