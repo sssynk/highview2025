@@ -139,6 +139,20 @@ async function runMigrations() {
     `);
     console.log('✅ Extra_points table created\n');
 
+    // Create student_notes table
+    console.log('📋 Creating student_notes table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS student_notes (
+        id SERIAL PRIMARY KEY,
+        student_id VARCHAR(50) REFERENCES students(student_id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_by VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Student_notes table created\n');
+
     // Create indexes
     console.log('📋 Creating indexes...');
     await client.query(`
@@ -164,6 +178,10 @@ async function runMigrations() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_users_student 
       ON users(student_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_student_notes_student 
+      ON student_notes(student_id)
     `);
     console.log('✅ Indexes created\n');
 

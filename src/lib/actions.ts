@@ -365,3 +365,170 @@ export async function getDashboardStats() {
   }
 }
 
+// ========== STUDENT DETAIL PAGE ACTIONS ==========
+
+export async function getStudentWithDetails(studentId: string) {
+  try {
+    // Get student with points
+    const studentsResult = await query(`
+      SELECT 
+        s.*,
+        COALESCE(SUM(sa.points), 0) as total_session_points,
+        COALESCE(SUM(ep.points), 0) as total_extra_points,
+        COALESCE(SUM(sa.points), 0) + COALESCE(SUM(ep.points), 0) as total_points,
+        COUNT(DISTINCT CASE WHEN sa.points = 5 THEN sa.session_id END) as sessions_attended,
+        COUNT(DISTINCT sess.session_id) as total_sessions
+      FROM students s
+      LEFT JOIN session_attendance sa ON s.student_id = sa.student_id
+      LEFT JOIN extra_points ep ON s.student_id = ep.student_id
+      LEFT JOIN sessions sess ON 1=1
+      WHERE s.student_id = $1
+      GROUP BY s.student_id, s.first_name, s.last_name, s.company, s.created_at
+    `, [studentId]);
+
+    if (studentsResult.rows.length === 0) {
+      return null;
+    }
+
+    const student = studentsResult.rows[0];
+
+    // Get attendance records
+    const attendanceResult = await query(`
+      SELECT 
+        sa.session_id,
+        sess.name as session_name,
+        sess.date,
+        sa.points
+      FROM session_attendance sa
+      JOIN sessions sess ON sa.session_id = sess.session_id
+      WHERE sa.student_id = $1
+      ORDER BY sess.date DESC
+    `, [studentId]);
+
+    return {
+      ...student,
+      attendance: attendanceResult.rows,
+    };
+  } catch (error) {
+    console.error('Error fetching student details:', error);
+    return null;
+  }
+}
+
+export async function getStudentNotes(studentId: string) {
+  try {
+    const result = await query(`
+      SELECT * FROM student_notes 
+      WHERE student_id = $1 
+      ORDER BY created_at DESC
+    `, [studentId]);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching student notes:', error);
+    return [];
+  }
+}
+
+export async function addStudentNote(data: {
+  student_id: string;
+  content: string;
+}) {
+  try {
+    await query(
+      'INSERT INTO student_notes (student_id, content) VALUES ($1, $2)',
+      [data.student_id, data.content]
+    );
+    revalidatePath(`/student?id=${data.student_id}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error adding student note:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function deleteStudentNote(noteId: number) {
+  try {
+    await query('DELETE FROM student_notes WHERE id = $1', [noteId]);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting student note:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function getUpcomingSessions() {
+  try {
+    const result = await query(`
+      SELECT * FROM sessions 
+      WHERE date >= CURRENT_DATE 
+      ORDER BY date ASC 
+      LIMIT 5
+    `);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching upcoming sessions:', error);
+    return [];
+  }
+}
+
+export async function getSessionDetails(sessionId: string) {
+  try {
+    const result = await query(`
+      SELECT * FROM sessions WHERE session_id = $1
+    `, [sessionId]);
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    // Note: In production, you'd also fetch instructors and resources
+    // For now, return session with empty arrays
+    return {
+      ...result.rows[0],
+      description: null,
+      instructors: [],
+      resources: [],
+    };
+  } catch (error) {
+    console.error('Error fetching session details:', error);
+    return null;
+  }
+}
+
+export async function getStudentProgressChart(studentId: string) {
+  try {
+    const result = await query(`
+      SELECT 
+        sess.date,
+        SUM(sa.points) OVER (ORDER BY sess.date) as cumulative_points
+      FROM session_attendance sa
+      JOIN sessions sess ON sa.session_id = sess.session_id
+      WHERE sa.student_id = $1
+      ORDER BY sess.date ASC
+    `, [studentId]);
+
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching student progress:', error);
+    return [];
+  }
+}
+
+export async function generateGoogleCalendarLink(session: any) {
+  const startDate = new Date(session.date);
+  const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour later
+  
+  const formatDate = (date: Date) => {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: session.name,
+    dates: `${formatDate(startDate)}/${formatDate(endDate)}`,
+    details: session.description || '',
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+

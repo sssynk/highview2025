@@ -13,9 +13,11 @@ import {
 } from '@/lib/actions';
 import { StudentWithPoints, ExtraPoints } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Plus, Upload, Trash2, Award, Mail } from 'lucide-react';
+import { Plus, Upload, Trash2, Award, Mail, Eye } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function StudentsPage() {
+  const router = useRouter();
   const [students, setStudents] = useState<StudentWithPoints[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -221,10 +223,18 @@ export default function StudentsPage() {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => router.push(`/student?id=${student.student_id}`)}
+                          title="View Student"
+                        >
+                          <Eye className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => handleShowFollowUp(student)}
                           title="Follow-up Points"
                         >
-                          <Mail className="h-4 w-4 text-blue-600" />
+                          <Mail className="h-4 w-4 text-green-600" />
                         </Button>
                         <Button
                           size="sm"
@@ -248,7 +258,7 @@ export default function StudentsPage() {
                 ))}
                 {students.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
                       No students yet. Add or import students to get started.
                     </td>
                   </tr>

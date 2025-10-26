@@ -10,6 +10,7 @@ export interface Session {
   session_id: string;
   name: string;
   date: string;
+  description?: string | null;
   created_at?: Date;
 }
 
@@ -45,6 +46,67 @@ export interface SessionWithAttendance extends Session {
     company: string;
     points: number;
   }[];
+}
+
+export interface DashboardStats {
+  totalStudents: number;
+  totalSessions: number;
+  averagePoints: number;
+  averageAttendance: string;
+}
+
+export interface StudentAttendanceRecord {
+  session_id: string;
+  session_name: string;
+  date: string;
+  points: number;
+}
+
+export interface StudentDetails extends StudentWithPoints {
+  attendance: StudentAttendanceRecord[];
+}
+
+export interface AttendanceDispute {
+  id: number;
+  student_id: string;
+  session_id: string;
+  session_name?: string;
+  message: string;
+  status: 'pending' | 'reviewed' | 'resolved';
+  instructor_response?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SessionWithDetails extends Session {
+  description?: string | null;
+  instructors?: Array<{
+    instructor_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  }>;
+  resources?: Array<{
+    id: number;
+    type: string;
+    title: string;
+    content?: string | null;
+    url?: string | null;
+  }>;
+}
+
+export interface ProgressDataPoint {
+  date: string;
+  cumulative_points: number;
+}
+
+export interface StudentNote {
+  id?: number;
+  student_id: string;
+  content: string;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Generate random ID
