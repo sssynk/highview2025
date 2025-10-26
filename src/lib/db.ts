@@ -1,17 +1,31 @@
 import { Pool } from 'pg';
 
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
+const MOCK_MODE = process.env.MOCK_MODE === 'true';
+
+let pool: Pool | null = null;
+
+if (!MOCK_MODE) {
+  pool = new Pool({
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  });
+}
 
 export const query = async (text: string, params?: unknown[]) => {
+  if (MOCK_MODE) {
+    return { rows: [], rowCount: 0 };
+  }
+  
+  if (!pool) {
+    throw new Error('Database pool not initialized');
+  }
+  
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
@@ -20,12 +34,20 @@ export const query = async (text: string, params?: unknown[]) => {
 };
 
 export const getClient = async () => {
+  if (MOCK_MODE || !pool) {
+    throw new Error('Database not available in mock mode');
+  }
   const client = await pool.connect();
   return client;
 };
 
 // Initialize database schema
 export const initializeDatabase = async () => {
+  if (MOCK_MODE) {
+    console.log('Mock mode: skipping database initialization');
+    return;
+  }
+  
   const client = await getClient();
   
   try {

@@ -17,6 +17,9 @@ import {
   ProgressDataPoint,
 } from './types';
 import { revalidatePath } from 'next/cache';
+import { mockStudentData, mockUpcomingSessions, mockDisputes, mockSessionDetails, mockProgressChartData } from './mock-data';
+
+const MOCK_MODE = process.env.MOCK_MODE === 'true';
 
 // Initialize database on first run
 export async function setupDatabase() {
@@ -87,6 +90,10 @@ export async function getStudentAttendance(student_id: string): Promise<StudentA
 }
 
 export async function getStudentWithDetails(student_id: string) {
+  if (MOCK_MODE) {
+    return mockStudentData;
+  }
+  
   try {
     const studentResult = await query(
       'SELECT * FROM students WHERE student_id = $1',
@@ -146,6 +153,10 @@ export async function createAttendanceDispute(data: {
 }
 
 export async function getStudentDisputes(student_id: string): Promise<AttendanceDispute[]> {
+  if (MOCK_MODE) {
+    return mockDisputes;
+  }
+  
   try {
     const result = await query(
       `SELECT 
@@ -457,6 +468,10 @@ export async function getDashboardStats() {
 }
 
 export async function getUpcomingSessions(): Promise<Session[]> {
+  if (MOCK_MODE) {
+    return mockUpcomingSessions;
+  }
+  
   try {
     const result = await query(
       'SELECT * FROM sessions WHERE date >= CURRENT_DATE ORDER BY date ASC, name'
@@ -471,6 +486,10 @@ export async function getUpcomingSessions(): Promise<Session[]> {
 export async function getSessionDetails(
   session_id: string
 ): Promise<SessionWithDetails | null> {
+  if (MOCK_MODE) {
+    return mockSessionDetails as unknown as SessionWithDetails;
+  }
+  
   try {
     const sessionResult = await query(
       'SELECT * FROM sessions WHERE session_id = $1',
@@ -508,6 +527,10 @@ export async function getSessionDetails(
 export async function getStudentProgressChart(
   student_id: string
 ): Promise<ProgressDataPoint[]> {
+  if (MOCK_MODE) {
+    return mockProgressChartData;
+  }
+  
   try {
     const result = await query(
       `SELECT 
